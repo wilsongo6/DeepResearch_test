@@ -2,7 +2,6 @@ import json
 import json5
 import os
 from typing import Dict, Iterator, List, Literal, Optional, Tuple, Union
-from qwen_agent.llm.schema import Message
 from qwen_agent.utils.utils import build_text_completion_prompt
 from openai import OpenAI, APIError, APIConnectionError, APITimeoutError
 from transformers import AutoTokenizer 
@@ -15,10 +14,7 @@ from qwen_agent.tools import BaseTool
 from qwen_agent.utils.utils import format_as_text_message, merge_generate_cfgs
 from prompt import *
 import time
-import asyncio
 
-from tool_file import *
-from tool_scholar import *
 from tool_python import *
 from tool_search import *
 from tool_visit import *
@@ -29,8 +25,6 @@ OBS_END = '\n</tool_response>'
 MAX_LLM_CALL_PER_RUN = int(os.getenv('MAX_LLM_CALL_PER_RUN', 100))
 
 TOOL_CLASS = [
-    FileParser(),
-    Scholar(),
     Visit(),
     Search(),
     PythonInterpreter(),
@@ -52,6 +46,11 @@ class MultiTurnReactAgent(FnCallAgent):
 
         self.llm_generate_cfg = llm["generate_cfg"]
         self.llm_local_path = llm["model"]
+        self._tool_name_lookup = {
+            self._normalize_tool_name(name): name
+            for name in TOOL_MAP.keys()
+        }
+        self._supported_tool_display = sorted(TOOL_MAP.keys())
 
     def sanity_check_output(self, content):
         return "<think>" in content and "</think>" in content
@@ -226,22 +225,25 @@ class MultiTurnReactAgent(FnCallAgent):
         return result
 
     def custom_call_tool(self, tool_name: str, tool_args: dict, **kwargs):
-        if tool_name in TOOL_MAP:
-            tool_args["params"] = tool_args
-            if "python" in tool_name.lower():
-                result = TOOL_MAP['PythonInterpreter'].call(tool_args)
-            elif tool_name == "parse_file":
-                params = {"files": tool_args["files"]}
-                
-                raw_result = asyncio.run(TOOL_MAP[tool_name].call(params, file_root_path="./eval_data/file_corpus"))
-                result = raw_result
+        canonical_name = self._tool_name_lookup.get(
+            self._normalize_tool_name(tool_name)
+        )
+        if not canonical_name:
+            return self._handle_missing_tool(tool_name)
 
-                if not isinstance(raw_result, str):
-                    result = str(raw_result)
-            else:
-                raw_result = TOOL_MAP[tool_name].call(tool_args, **kwargs)
-                result = raw_result
-            return result
+        tool_args["params"] = tool_args
+        if "python" in canonical_name.lower():
+            return TOOL_MAP['PythonInterpreter'].call(tool_args)
 
-        else:
-            return f"Error: Tool {tool_name} not found"
+        result = TOOL_MAP[canonical_name].call(tool_args, **kwargs)
+        return result
+
+    @staticmethod
+    def _normalize_tool_name(tool_name: Optional[str]) -> str:
+        return (tool_name or "").strip().lower()
+
+    def _handle_missing_tool(self, tool_name: str) -> str:
+        available = ""
+        if self._supported_tool_display:
+            available = f" Supported tools: {', '.join(self._supported_tool_display)}."
+        return f"Tool '{tool_name}' is unavailable. Please continue with the supported tools to gather the necessary information.{available}"

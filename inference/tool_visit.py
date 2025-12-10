@@ -6,7 +6,10 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Union
 import requests
 from qwen_agent.tools.base import BaseTool, register_tool
-from prompt import EXTRACTOR_PROMPT 
+try:
+    from .prompt import EXTRACTOR_PROMPT
+except ImportError:  # Fallback when running as a script
+    from prompt import EXTRACTOR_PROMPT
 from openai import OpenAI
 import random
 from urllib.parse import urlparse, unquote
@@ -17,7 +20,7 @@ import tiktoken
 VISIT_SERVER_TIMEOUT = int(os.getenv("VISIT_SERVER_TIMEOUT", 200))
 WEBCONTENT_MAXLENGTH = int(os.getenv("WEBCONTENT_MAXLENGTH", 150000))
 
-JINA_API_KEYS = os.getenv("JINA_API_KEYS", "")
+# JINA_API_KEYS = os.getenv("JINA_API_KEYS", "")
 
 
 @staticmethod
@@ -142,16 +145,14 @@ class Visit(BaseTool):
         """
         max_retries = 3
         timeout = 50
+        base_url = "https://reader.psmoe.com/glm/r/"
         
         for attempt in range(max_retries):
-            headers = {
-                "Authorization": f"Bearer {JINA_API_KEYS}",
-            }
             try:
                 response = requests.get(
-                    f"https://r.jina.ai/{url}",
-                    headers=headers,
-                    timeout=timeout
+                    f"{base_url}{url}",
+                    timeout=timeout,
+                    verify=False
                 )
                 if response.status_code == 200:
                     webpage_content = response.text
@@ -160,6 +161,7 @@ class Visit(BaseTool):
                     print(response.text)
                     raise ValueError("jina readpage error")
             except Exception as e:
+                print(f"[visit] jina_readpage attempt {attempt + 1}/{max_retries} failed for {url}: {e}")
                 time.sleep(0.5)
                 if attempt == max_retries - 1:
                     return "[visit] Failed to read page."

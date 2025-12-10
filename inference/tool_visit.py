@@ -16,11 +16,11 @@ from urllib.parse import urlparse, unquote
 import time 
 from transformers import AutoTokenizer
 import tiktoken
+from zai import ZhipuAiClient
 
 VISIT_SERVER_TIMEOUT = int(os.getenv("VISIT_SERVER_TIMEOUT", 200))
 WEBCONTENT_MAXLENGTH = int(os.getenv("WEBCONTENT_MAXLENGTH", 150000))
 
-# JINA_API_KEYS = os.getenv("JINA_API_KEYS", "")
 
 
 @staticmethod
@@ -100,19 +100,23 @@ class Visit(BaseTool):
         return response.strip()
         
     def call_server(self, msgs, max_retries=2):
-        api_key = os.environ.get("API_KEY")
-        url_llm = os.environ.get("API_BASE")
+        api_key = os.environ.get("SUMMARY_API_KEY")
+        url_llm = os.environ.get("SUMMARY_API_BASE")
         model_name = os.environ.get("SUMMARY_MODEL_NAME", "")
-        client = OpenAI(
-            api_key=api_key,
-            base_url=url_llm,
-        )
+
+        # client = OpenAI(
+        #     api_key=api_key,
+        #     base_url=url_llm,
+        # )
+        #先使用BigModel
+        client = ZhipuAiClient(api_key=api_key)
+
         for attempt in range(max_retries):
             try:
                 chat_response = client.chat.completions.create(
                     model=model_name,
                     messages=msgs,
-                    temperature=0.7
+                    temperature=0.6
                 )
                 content = chat_response.choices[0].message.content
                 if content:
@@ -126,11 +130,10 @@ class Visit(BaseTool):
                             content = content[left:right+1]
                     return content
             except Exception as e:
-                # print(e)
+                print(e)
                 if attempt == (max_retries - 1):
                     return ""
                 continue
-
 
     def jina_readpage(self, url: str) -> str:
         """

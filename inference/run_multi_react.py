@@ -12,14 +12,14 @@ import math
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", type=str, default="")
+    parser.add_argument("--model", type=str, default="Qwen3-8B")
     parser.add_argument("--output", type=str, default="")
-    parser.add_argument("--dataset", type=str, default="gaia")
+    parser.add_argument("--dataset", type=str, default="test.jsonl")
     parser.add_argument("--temperature", type=float, default=0.6)
     parser.add_argument("--top_p", type=float, default=0.95)
     parser.add_argument("--presence_penalty", type=float, default=1.1)
     parser.add_argument("--max_workers", type=int, default=20)
-    parser.add_argument("--roll_out_count", type=int, default=3)
+    parser.add_argument("--roll_out_count", type=int, default=1)
     parser.add_argument("--total_splits", type=int, default=1)
     parser.add_argument("--worker_split", type=int, default=1)
     args = parser.parse_args()
@@ -110,7 +110,7 @@ if __name__ == "__main__":
     tasks_to_run_all = []
     per_rollout_task_counts = {i: 0 for i in range(1, roll_out_count + 1)}
     # Define ports
-    planning_ports = [6001, 6002, 6003, 6004, 6005, 6006, 6007, 6008]
+    planning_ports = [8000, 6002, 6003, 6004, 6005, 6006, 6007, 6008]
     # Round-robin state
     planning_rr_idx = 0
     summary_rr_idx = 0
@@ -166,7 +166,7 @@ if __name__ == "__main__":
 
         test_agent = MultiTurnReactAgent(
             llm=llm_cfg,
-            function_list=["search", "visit", "google_scholar", "PythonInterpreter"]
+            function_list=["search", "visit", "PythonInterpreter"]
         )
 
         write_locks = {i: threading.Lock() for i in range(1, roll_out_count + 1)}

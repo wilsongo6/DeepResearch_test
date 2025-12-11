@@ -100,9 +100,9 @@ class Visit(BaseTool):
         return response.strip()
         
     def call_server(self, msgs, max_retries=2):
-        api_key = os.environ.get("SUMMARY_API_KEY")
+        api_key = os.environ.get("SUMMARY_API_KEY", "6c4ffed3020c4af5bb82414ac8de9530.9RfQw9HQ4UdcC6ZS")
         url_llm = os.environ.get("SUMMARY_API_BASE")
-        model_name = os.environ.get("SUMMARY_MODEL_NAME", "")
+        model_name = os.environ.get("SUMMARY_MODEL_NAME", "glm-4.6")
 
         # client = OpenAI(
         #     api_key=api_key,

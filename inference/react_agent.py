@@ -23,6 +23,7 @@ OBS_START = '<tool_response>'
 OBS_END = '\n</tool_response>'
 
 MAX_LLM_CALL_PER_RUN = int(os.getenv('MAX_LLM_CALL_PER_RUN', 100))
+DEFAULT_TOKENIZER_ID = os.getenv('TOKENIZER_MODEL_NAME', 'Qwen/Qwen3-8B')
 
 TOOL_CLASS = [
     Visit(),
@@ -56,9 +57,9 @@ class MultiTurnReactAgent(FnCallAgent):
         return "<think>" in content and "</think>" in content
     
     def call_server(self, msgs, planning_port, max_tries=10):
-        
+
         openai_api_key = "EMPTY"
-        openai_api_base = f"http://127.0.0.1:{planning_port}/v1"
+        openai_api_base = f"http://192.168.31.201:{planning_port}/v1"
 
         client = OpenAI(
             api_key=openai_api_key,
@@ -77,14 +78,14 @@ class MultiTurnReactAgent(FnCallAgent):
                     temperature=self.llm_generate_cfg.get('temperature', 0.6),
                     top_p=self.llm_generate_cfg.get('top_p', 0.95),
                     logprobs=True,
-                    max_tokens=10000,
+                    max_tokens=12000,
                     presence_penalty=self.llm_generate_cfg.get('presence_penalty', 1.1)
                 )
                 content = chat_response.choices[0].message.content
 
                 # OpenRouter provides API calling. If you want to use OpenRouter, you need to uncomment line 89 - 90.
                 # reasoning_content = "<think>\n" + chat_response.choices[0].message.reasoning.strip() + "\n</think>"
-                # content = reasoning_content + content                
+                # content = reasoning_content + content
                 
                 if content and content.strip():
                     print("--- Service call successful, received a valid response ---")
@@ -108,8 +109,10 @@ class MultiTurnReactAgent(FnCallAgent):
         
         return f"vllm server error!!!"
 
+    #调用 API 时先注释
     def count_tokens(self, messages):
-        tokenizer = AutoTokenizer.from_pretrained(self.llm_local_path) 
+        # tokenizer = AutoTokenizer.from_pretrained(self.llm_local_path)  先使用在线 tokenizer
+        tokenizer = AutoTokenizer.from_pretrained(DEFAULT_TOKENIZER_ID)
         full_prompt = tokenizer.apply_chat_template(messages, tokenize=False)
         tokens = tokenizer(full_prompt, return_tensors="pt")
         token_count = len(tokens["input_ids"][0])

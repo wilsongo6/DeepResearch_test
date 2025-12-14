@@ -14,6 +14,7 @@ from qwen_agent.tools import BaseTool
 from qwen_agent.utils.utils import format_as_text_message, merge_generate_cfgs
 from prompt import *
 import time
+import httpx
 
 from tool_python import *
 from tool_search import *
@@ -23,7 +24,7 @@ OBS_START = '<tool_response>'
 OBS_END = '\n</tool_response>'
 
 MAX_LLM_CALL_PER_RUN = int(os.getenv('MAX_LLM_CALL_PER_RUN', 100))
-DEFAULT_TOKENIZER_ID = os.getenv('TOKENIZER_MODEL_NAME', 'Qwen/Qwen3-8B')
+DEFAULT_TOKENIZER_ID = os.getenv('TOKENIZER_MODEL_NAME', 'Qwen/Qwen2.5-7B-Instruct')
 
 TOOL_CLASS = [
     Visit(),
@@ -64,7 +65,7 @@ class MultiTurnReactAgent(FnCallAgent):
         client = OpenAI(
             api_key=openai_api_key,
             base_url=openai_api_base,
-            timeout=600.0,
+            # timeout=600.0,
         )
 
         base_sleep_time = 1 
@@ -78,7 +79,7 @@ class MultiTurnReactAgent(FnCallAgent):
                     temperature=self.llm_generate_cfg.get('temperature', 0.6),
                     top_p=self.llm_generate_cfg.get('top_p', 0.95),
                     logprobs=True,
-                    max_tokens=12000,
+                    max_tokens=10000,
                     presence_penalty=self.llm_generate_cfg.get('presence_penalty', 1.1)
                 )
                 content = chat_response.choices[0].message.content
@@ -109,14 +110,17 @@ class MultiTurnReactAgent(FnCallAgent):
         
         return f"vllm server error!!!"
 
-    #调用 API 时先注释
     def count_tokens(self, messages):
-        # tokenizer = AutoTokenizer.from_pretrained(self.llm_local_path)  先使用在线 tokenizer
+        """
+        简单估算 token 数量，不需要调用外网分词器
+        使用字符数作为保守估算（实际 token 数通常更少）
+        """
+        # 原方法（需要下载 tokenizer，已注释）：
         tokenizer = AutoTokenizer.from_pretrained(DEFAULT_TOKENIZER_ID)
         full_prompt = tokenizer.apply_chat_template(messages, tokenize=False)
         tokens = tokenizer(full_prompt, return_tensors="pt")
         token_count = len(tokens["input_ids"][0])
-        
+
         return token_count
 
     def _run(self, data: str, model: str, **kwargs) -> List[List[Message]]:

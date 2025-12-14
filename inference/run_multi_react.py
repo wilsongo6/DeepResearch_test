@@ -12,13 +12,13 @@ import math
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", type=str, default="Qwen3-8B")
+    parser.add_argument("--model", type=str, default="Qwen2.5-7B")
     parser.add_argument("--output", type=str, default="")
-    parser.add_argument("--dataset", type=str, default="test.jsonl")
+    parser.add_argument("--dataset", type=str, default="gaia_2023_level2_validation.jsonl")
     parser.add_argument("--temperature", type=float, default=0.6)
     parser.add_argument("--top_p", type=float, default=0.95)
     parser.add_argument("--presence_penalty", type=float, default=1.1)
-    parser.add_argument("--max_workers", type=int, default=20)
+    parser.add_argument("--max_workers", type=int, default=5)
     parser.add_argument("--roll_out_count", type=int, default=1)
     parser.add_argument("--total_splits", type=int, default=1)
     parser.add_argument("--worker_split", type=int, default=1)
@@ -99,8 +99,8 @@ if __name__ == "__main__":
                     for line in f:
                         try:
                             data = json.loads(line)
-                            if "question" in data and "error" not in data:
-                                processed_queries.add(data["question"].strip())
+                            if "Question" in data and "error" not in data:
+                                processed_queries.add(data["Question"].strip())
                         except json.JSONDecodeError:
                             print(f"Warning: Skipping invalid line in output file: {line.strip()}")
             except FileNotFoundError:
@@ -109,8 +109,9 @@ if __name__ == "__main__":
 
     tasks_to_run_all = []
     per_rollout_task_counts = {i: 0 for i in range(1, roll_out_count + 1)}
-    # Define ports
-    planning_ports = [8000, 6002, 6003, 6004, 6005, 6006, 6007, 6008]
+    # Define ports - 只使用已确认运行的 vLLM 端口
+    # planning_ports = [6869, 6002, 6003, 6004, 6005, 6006, 6007, 6008]  八卡启用 8 个vllm实例，粘性路由复用kv cache跑pass@8
+    planning_ports = [6869]
     # Round-robin state
     planning_rr_idx = 0
     summary_rr_idx = 0

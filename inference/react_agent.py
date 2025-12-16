@@ -79,7 +79,7 @@ class MultiTurnReactAgent(FnCallAgent):
                     temperature=self.llm_generate_cfg.get('temperature', 0.6),
                     top_p=self.llm_generate_cfg.get('top_p', 0.95),
                     logprobs=True,
-                    max_tokens=10000,
+                    max_tokens=6000,
                     presence_penalty=self.llm_generate_cfg.get('presence_penalty', 1.1)
                 )
                 content = chat_response.choices[0].message.content
@@ -189,7 +189,8 @@ class MultiTurnReactAgent(FnCallAgent):
             if num_llm_calls_available <= 0 and '<answer>' not in content:
                 messages[-1]['content'] = 'Sorry, the number of llm calls exceeds the limit.'
 
-            max_tokens = 110 * 1024
+            # 设置上限token数
+            max_tokens = 24 * 1024
             token_count = self.count_tokens(messages)
             print(f"round: {round}, token count: {token_count}")
 

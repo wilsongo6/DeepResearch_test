@@ -99,11 +99,23 @@ def call_llm_judge(item):
     question = item["question"]
     correct_answer = item["answer"]
     response = item["prediction"].strip()
-    prompt = judge_prompt.format(question=question, correct_answer=correct_answer, response=response)
+    messages = item.get("messages", [])
+    reasoning = ""
+    for msg in reversed(messages):
+        if msg.get("role") == "assistant":
+            reasoning = msg.get("content", "")
+            break
+
+    prompt = judge_prompt.format(
+        question=question,
+        correct_answer=correct_answer,
+        response=response,
+        reasoning=reasoning
+    )
 
     for attempt in range(100):
         try:
-            if judge_model == "glm-4.5":
+            if judge_model == "glm-4.5-air":
                 response = client.chat.completions.create(
                     model=judge_model,
                     messages=[{"role": "user", "content": prompt}],
@@ -155,7 +167,8 @@ def call_llm_judge(item):
             return {
                 "question": question,
                 "answer": correct_answer,
-                "judgement": judgement
+                "judgement": judgement,
+                "reasoning": reasoning
             }
 
         except Exception as e:
@@ -165,7 +178,8 @@ def call_llm_judge(item):
                     "question": question,
                     "answer": correct_answer,
                     "judgement": "Error",
-                    "error": str(e)
+                    "error": str(e),
+                    "reasoning": reasoning
                 }
             time.sleep(3)
             continue
@@ -412,7 +426,7 @@ def main():
     dataset = args.dataset
     if dataset in ["gaia", "webwalker"]:
         # judge_model = "openai/qwen2.5-72b-instruct"
-        judge_model = "glm-4.5"
+        judge_model = "glm-4.5-air"
         judge_prompt = JUDGE_PROMPT_GAIA
     elif dataset in ["xbench-deepsearch"]:
         judge_prompt = JUDGE_PROMPT_XBENCH
@@ -441,7 +455,7 @@ def main():
 
     # 并行评估
     results = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
         futures = {executor.submit(call_llm_judge, item): item for item in items}
 
         for future in tqdm(concurrent.futures.as_completed(futures), total=len(futures), desc=f"Evaluating"):
@@ -460,6 +474,8 @@ def main():
             }
             if "error" in scored_result:
                 scored_item["error"] = scored_result["error"]
+            if "reasoning" in scored_result:
+                scored_item["reasoning"] = scored_result["reasoning"]
 
             scored_item.update(orig_item)
             f.write(json.dumps(scored_item, ensure_ascii=False) + '\n')
